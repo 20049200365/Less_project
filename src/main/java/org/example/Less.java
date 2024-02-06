@@ -128,7 +128,7 @@ public class Less {
         int cost_all = 0;
 
         if(isMac) {
-            System.out.println("store_cost_recording:" + (Tool.calculate_size(map_table)+3*(Tool.bit_calculate_size(ciphers)+Tool.byte_calculate_size(Mac_data))));
+            System.out.println("store_cost_recording:" + 3*(Tool.bit_calculate_size(ciphers)+Tool.byte_calculate_size(Mac_data)));
         }else {
             System.out.println("store_cost_recording:" + (3*Tool.bit_calculate_size(ciphers)));
         }
