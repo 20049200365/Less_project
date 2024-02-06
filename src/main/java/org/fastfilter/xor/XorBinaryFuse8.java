@@ -6,9 +6,6 @@ import java.util.Random;
 import org.fastfilter.Filter;
 import org.fastfilter.utils.Hash;
 
-/**
- * The xor binary fuse filter, a new algorithm that can replace a Bloom filter.
- */
 public class XorBinaryFuse8 implements Filter {
 
     private static final int ARITY = 3;

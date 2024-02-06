@@ -151,62 +151,6 @@ public class DMPF {
         return res;
     }
 
-    public static void main(String[] args) {
-
-        int n = 1000;
-        int input_size = 20;
-        long[] alpha = new long[input_size];
-        ArrayList<Long> vals = new ArrayList<Long>();
-        for(int i = 0;i<input_size;i++)
-        {
-            do {
-                alpha[i] = Utils.getRandomNumber(0, n - 1);
-            }while (vals.contains(alpha[i]));
-            vals.add(alpha[i]);
-        }
-        System.out.println(Arrays.toString(vals.toArray()));
-        System.out.println(Arrays.toString(alpha));
-
-        int t = alpha.length;
-        int tau = 128;
-        int lambda = 128;
-        DMPF dmpf = new DMPF(tau, n, lambda);
-        Bits[] keys = dmpf.Gen(alpha);
-        System.out.println("key length:"+keys[0].length());
-
-//        double start,end;
-//        start = System.nanoTime();
-//        for(int test=0;test<n;test++)
-//        {
-//            boolean res = dmpf.Eval(false,keys[0],test,t);
-//        }
-//        end = System.nanoTime();
-//        System.out.printf("server-0 latency: %,.1f\n", (end-start)/1000000);
-//
-//        start = System.nanoTime();
-//        for(int test=0;test<n;test++)
-//        {
-//            boolean res = dmpf.Eval(true,keys[1],test,t);
-//        }
-//        end = System.nanoTime();
-//        System.out.printf("server-1 latency: %,.1f\n", (end-start)/1000000);
-//
-//        System.out.println("k0:"+keys[0]);
-//        System.out.println("k1:"+keys[1]);
-
-        for(long test=0;test<n;test++)
-        {
-            boolean res_0 = dmpf.Eval(false,keys[0],test,t);
-            boolean res_1 = dmpf.Eval(true,keys[1],test,t);
-
-            if(res_0 ^ res_1) {
-                if (!vals.contains(test)) {
-                    System.out.println("Error");
-                    System.out.println(test);
-                }
-            }
-        }
-    }
 
 
 }

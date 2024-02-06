@@ -108,27 +108,7 @@ public class xor_hom {
     }
 
     public static void main(String[] args) {
-/*
-        initial();
-        byte[] test1={1,2};
-        byte[] test2={6,3};
 
-        byte[] test8={8,9};
-        byte[] test3=tool.Xor(tool.Xor(test1,test2),test8);
-
-        int key=678;
-        byte[] test4=Gen_Proof(test3,key);
-        System.out.println(Arrays.toString(test4));
-
-        byte[] test5=Gen_Proof(test1,key);
-        byte[] test6=Gen_Proof(test2,key);
-        byte[] test9=Gen_Proof(test8,key);
-        byte[] test7=tool.Xor(tool.Xor(test6,test5),test9);
-        System.out.println(Arrays.toString(test5));
-        System.out.println(Arrays.toString(test6));
-        System.out.println(Arrays.toString(test9));
-        System.out.println(Arrays.toString(test7));
- */
         initial();
         byte[] test1={1,2};
         byte[] test2={6,3};

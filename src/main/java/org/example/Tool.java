@@ -149,12 +149,12 @@ public class Tool {
         return data.length *calculate_size(data[0]);
     }
 
-    public static long calculate_size(Bits[][] data){
-        return data.length*calculate_size(data[0]);
-    }
-
-    public static long calculate_size(byte[][] data){
-        return (long) data.length *data[0].length;
+    public static long calculate_size(List<List<Integer>> map_table){
+        long ret=0;
+        for (int i=0;i<map_table.size();i++){
+            ret=map_table.get(i).size()*32;
+        }
+        return ret;
     }
 
     public static List<long[]> split(long[] keyword,long seed,int keyword_size){

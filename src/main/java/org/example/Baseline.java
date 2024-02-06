@@ -365,7 +365,7 @@ public class Baseline {
     }
 
     public static void main(String[] args) {
-            String[] search_word_all = new String[]{"trip","desir","necessari","busi","meet","product","tri","stimul","speak","quiet","wait","meet","held","round","tabl","format","austin","play","golf","rent","ski","boat","jet","ski","fli","somewher","time"};
+            String[] search_word_all = new String[]{"0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11"};
             String path;
             int max_size, doc_size, mode;
             String[] search_word=new String[1];
@@ -373,9 +373,9 @@ public class Baseline {
             System.out.println(Arrays.toString(search_word));
             System.out.println("num of search_word:"+search_word.length);
 
-            path = "D:\\study\\paper\\paper_code\\Less_project\\src\\main\\java\\org\\example\\dataset\\Dory_data_128.csv";
+            path = "D:\\study\\paper\\paper_code\\Less_project\\src\\main\\java\\org\\example\\dataset\\synthetic_128_100.csv";
             max_size = 128;
-            doc_size = 16;
+            doc_size = 100;
             mode = 2;
             Baseline bl_test = new Baseline(path, max_size, doc_size, mode, search_word);
             boolean isMAC = false;

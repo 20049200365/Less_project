@@ -106,10 +106,10 @@ public class Less {
         Bits[] ext_key = new Bits[plaintext.length];
         PropertiesCache properties = new PropertiesCache();
         int ver = 0;
-        Bits mkey = Utils.base64ToBits(properties.read("Key1"), lambda); //base64转bits Key1=AlPBDphvmEu8M8dQWDKJDw\=\=
+        Bits mkey = Utils.base64ToBits(properties.read("Key1"), lambda); 
         for (int i = 0; i < plaintext.length; i++) {
             Bits enc_key = PRFCipher.generateKey(mkey, lambda, i, ver);
-            ext_key[i] = PRFCipher.extend_key(enc_key, lambda, plaintext[i].length());//把密钥拓展到和明文一样长
+            ext_key[i] = PRFCipher.extend_key(enc_key, lambda, plaintext[i].length());
             ciphers[i] = (Bits) plaintext[i].clone();
             ciphers[i].xor(ext_key[i]);
         }
@@ -121,7 +121,6 @@ public class Less {
     }
 
     public static void SearchTest_DMPF(String[] search_word, XorBinaryFuse8[] Xor_filter, boolean isMac) {
-        //读取数据
         int fingerprints_bit_len = Xor_filter[0].get_fingerprints_bit_len();
         int num_bits_per_row = (int) Xor_filter[0].getBitCount();
         int num_per_row = num_bits_per_row / fingerprints_bit_len;
@@ -129,9 +128,9 @@ public class Less {
         int cost_all = 0;
 
         if(isMac) {
-            System.out.println("store_cost_recording:" + (Tool.bit_calculate_size(ciphers)+Tool.byte_calculate_size(Mac_data)));
+            System.out.println("store_cost_recording:" + (Tool.calculate_size(map_table)+3*(Tool.bit_calculate_size(ciphers)+Tool.byte_calculate_size(Mac_data))));
         }else {
-            System.out.println("store_cost_recording:" + Tool.bit_calculate_size(ciphers));
+            System.out.println("store_cost_recording:" + (3*Tool.bit_calculate_size(ciphers)));
         }
 
         Bits[] all_dec_keys = Utils.read_all_keys(key_path, num_bits_per_row, store_size);
@@ -373,7 +372,7 @@ public class Less {
         XorBinaryFuse8 xorBinaryFuse8=XorBinaryFuse8.construct(keyword_size,update_data,fpp);
 
         if(xorBinaryFuse8.getSeed()!=0){
-            List<long[]> split_file=Tool.split(update_data,0,keyword_size);//生成失败的话拆分后再上传
+            List<long[]> split_file=Tool.split(update_data,0,keyword_size);
             for (long[] longs : split_file) {
                 XorBinaryFuse8 temp = XorBinaryFuse8.construct(keyword_size, longs, fpp);
                 filter_list.add(temp);
@@ -418,27 +417,27 @@ public class Less {
                 Mac_data[i] = ByteUtils.xor(Mac_data[i], all_doc_rnds[i]);
             }
 
-            System.out.println("update cost:"+(cipher.length*cipher[0].length()/8+fingerprints_num * XORMAC.MACBYTES*chi));
+            System.out.println("update cost:"+(3*(cipher.length*cipher[0].length()/8+fingerprints_num * XORMAC.MACBYTES*chi)));
         }
 
         end= System.nanoTime();
         if(!isMac)
-            System.out.println("update cost:"+cipher.length*cipher[0].length()/8);
+            System.out.println("update cost:"+(3*cipher.length*cipher[0].length()/8));
         System.out.println("client Update time:"+(end-start)/1000000+"ms");
 
     }
 
     public static void initial(){
-        datasize = 100;//Enron total file num:514324  WorldLanguage total file num:600000
+        datasize = 100;
         keyword_size = 128;
-        data_path = "D:\\study\\paper\\paper_code\\Less_project\\src\\main\\java\\org\\example\\dataset\\Dory_data_128.csv";
+        data_path = "D:\\study\\paper\\paper_code\\Less_project\\src\\main\\java\\org\\example\\dataset\\synthetic_128_100.csv";
         isMac = true;
         fpp = Math.pow(2, -24);
     }
 
     public static void main(String[] args) throws NoSuchAlgorithmException {
         //Create search_word
-        String[] search_word_all = new String[]{"travel", "busi", "meet", "fun", "trip", "especi", "prepar", "hold", "busi", "plan", "meet", "trip", "ani", "formal", "busi", "meet", "tri", "honest", "opinion", "trip", "desir", "necessari", "busi", "meet", "product", "tri", "stimul", "speak", "quiet", "wait", "meet", "held", "round", "tabl", "format", "austin", "play", "golf", "rent", "ski", "boat", "jet", "ski", "fli", "somewher", "time"};
+        String[] search_word_all = new String[]{"0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11"};
         String[] search_word = new String[6];
         long[] update_data = new long[]{1L, 2L, 3L};
         System.arraycopy(search_word_all, 0, search_word, 0, search_word.length);
