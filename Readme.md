@@ -12,7 +12,7 @@ World Language: https://www.statmt.org/lm-benchmark/
 
    ​	keyword_size is the number of keywords contained in each file. By default, the number of keywords in each file is the same
 
-2. Change file path cipher_path,key_path,key_original_path与data_path
+2. Change file path cipher_path,key_path,key_original_path and data_path
 
    ​	The file represented by cipher_path,key_path,key_original_path is generated in code
 
