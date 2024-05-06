@@ -20,18 +20,19 @@ World Language: https://www.statmt.org/lm-benchmark/
 
 # Result
 
-Take the query {"view", "last", "library", "penthouse"} in Enron.csv as an example
+Take the query {"travel", "busi", "meet", "fun", "trip", "especi"} in Enron dataset as an example
 
 ```java
-[view, last, library, penthouse]
-num of search_word:4 
-Build time:252859.4145ms
-store_cost_recording:3404255832
-Queries cost:10592 byte
-Server search time:1786.1044ms
-Server returns cost:2419080 byte
-Server returns cost:2418080 byte
+[travel, busi, meet, fun, trip, especi]
+num of search_word:6
+Build time:203122.3022ms
+store_cost_recording:3178043472 byte
+Client - search query generation time:8.9305ms
+Queries cost:61424 byte
+Server search time:237.66ms
+Server returns cost:4185048 byte
+Mac verification succeeded!
 No.0 
-Client query time:1267.015ms
+Client query time:2112.1799ms
 ```
 
