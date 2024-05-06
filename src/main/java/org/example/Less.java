@@ -11,7 +11,8 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 
-public class Less {
+public class Less_2 {
+
 
     static public int datasize, keyword_size, store_size, lambda = 128;
     static public double start, end;
@@ -28,7 +29,6 @@ public class Less {
 
     static public byte[][] Mac_data;
     static public double fpp = Math.pow(2, -8);
-    static public List<List<Integer>> map_table = new ArrayList<>();
 
     static public CoverFamily cff;
 
@@ -38,6 +38,11 @@ public class Less {
 
     static public byte[][] all_doc_rnds;
 
+    static public Bits cuckoo_key;
+
+    static public int cuckoo_table_length,BFF_length,fingerprints_length;
+
+    static public long [][] position_record;//Record the mapped position of each element in BFF
     public static XorBinaryFuse8[] read_data(String path, int datasize, double fpp) {
         List<XorBinaryFuse8> ret = new ArrayList<XorBinaryFuse8>();
         File csv = new File(path);
@@ -83,21 +88,67 @@ public class Less {
                         }
                     }
                 }
-                map_table.add(list);
                 i++;
             }
         } catch (IOException e) {
             e.printStackTrace();
         }
+        BFF_length=ret.get(0).fingerprints.length;
+        fingerprints_length= (int) (-Math.log(fpp) / Math.log(2.0));
         return ret.toArray(new XorBinaryFuse8[0]);
     }
 
-    public static Bits[] extract_fingerprints(XorBinaryFuse8[] Xor_filter) {
+    public static Bits[] generate_cuckoo_table(XorBinaryFuse8[] Xor_filter){
         Bits[] ret = new Bits[Xor_filter.length];
-        int fingerprints_bit_len = (int) (-Math.log(fpp) / Math.log(2.0));
-        for (int i = 0; i < Xor_filter.length; i++) {
-            ret[i] = Tool.long_to_Bits(Xor_filter[i].fingerprints, fingerprints_bit_len);
+        double eta=1.5;
+        int M= (int) (eta*BFF_length);
+        int B=(int)Math.ceil(3.0*BFF_length/M);
+        int len = Utils.len_long(3L *BFF_length);
+        cuckoo_table_length=B*M;
+        long[] cuckoo_table=new long[cuckoo_table_length];
+
+        for (int i=0;i<cuckoo_table_length;i++){
+            cuckoo_table[i]=-1;
         }
+        Bits key=Utils.get_random_rits(lambda);
+        boolean success=false;
+        while (!success) {
+            position_record=new long[BFF_length][3];
+            boolean collision=false;
+            for (int i = 0; i < BFF_length; i++) {
+                for (int k = 1; k <= 3; k++) {
+                    int Loc_1 = (int) Cuckoo.hash(i, len, k, BFF_length, B, key, 3L * BFF_length);
+                    int Loc_2 = (int) Cuckoo.index(i, len, k, BFF_length, B, key, 3L * BFF_length);
+                    if (cuckoo_table[Loc_1 * B + Loc_2] == -1){
+                        cuckoo_table[Loc_1 * B + Loc_2] = i;
+                        position_record[i][k-1]= (long) Loc_1 * B + Loc_2;
+                    }
+                    else {
+                        collision=true;
+                        break;
+                    }
+                }
+                if(collision){
+                    break;
+                }
+            }
+            if (!collision)
+                success=true;
+        }
+
+        cuckoo_key=key;
+
+        int fingerprints_bit_len = (int) (-Math.log(fpp) / Math.log(2.0));
+        for (int i=0;i<Xor_filter.length;i++){
+            long[] temp=new long[cuckoo_table_length];
+            for (int j=0;j<BFF_length;j++){
+                temp[(int) position_record[j][0]]=Xor_filter[i].fingerprints[j];
+                temp[(int) position_record[j][1]]=Xor_filter[i].fingerprints[j];
+                temp[(int) position_record[j][2]]=Xor_filter[i].fingerprints[j];
+            }
+            ret[i]=Tool.long_to_Bits(temp,fingerprints_bit_len);
+        }
+
         return ret;
     }
 
@@ -106,7 +157,7 @@ public class Less {
         Bits[] ext_key = new Bits[plaintext.length];
         PropertiesCache properties = new PropertiesCache();
         int ver = 0;
-        Bits mkey = Utils.base64ToBits(properties.read("Key1"), lambda); 
+        Bits mkey = Utils.base64ToBits(properties.read("Key1"), lambda);
         for (int i = 0; i < plaintext.length; i++) {
             Bits enc_key = PRFCipher.generateKey(mkey, lambda, i, ver);
             ext_key[i] = PRFCipher.extend_key(enc_key, lambda, plaintext[i].length());
@@ -120,17 +171,57 @@ public class Less {
         return ciphers;
     }
 
+    public static void CreateMac() {
+        Bits source_key = Utils.base64ToBits(properties.read("MACKey_1"), lambda);
+        cff = new CoverFamily(1, 1);
+        chi = cff.getLines();
+        iv_keys = new Bits[chi];
+        mackeys = new byte[chi][];
+        mkey =Utils.base64ToBits(properties.read("Key1"), lambda);
+        mac_generate = new XORMAC[chi];
+        xor_hom.initial();
+        for (int i = 0; i < chi; i++) {
+            mackeys[i] = Utils.prf_to_len(source_key, Utils.stringToBits("MAC" + i, lambda), lambda).toByteArray();
+            iv_keys[i] = Utils.prf_to_len(mkey, Utils.byteArrayToBits(mackeys[i], lambda), lambda);
+            mac_generate[i] = new XORMAC(mackeys[i]);
+        }
+        all_doc_rnds = new byte[chi][cuckoo_table_length * XORMAC.MACBYTES];
+        for (int i = 0; i < chi; i++) {
+            for (int j = 0; j < ciphers.length; j++) {
+                byte[] Gamma=new byte[cuckoo_table_length * XORMAC.MACBYTES];
+                for(int n=0;n<cuckoo_table_length;n++){
+                    byte[] temp_Gamma=xor_hom.my_Gen_Proof(Tool.nonce_generate(j,lambda,n,cuckoo_table_length),Tool.bits_to_int(iv_keys[i]));
+                    for(int m=0;m<XORMAC.MACBYTES;m++)
+                        Gamma[n*XORMAC.MACBYTES+m]=temp_Gamma[m];
+                }
+                all_doc_rnds[i] = ByteUtils.xor(all_doc_rnds[i], Gamma);
+            }
+        }
+
+        Mac_data = new byte[chi][cuckoo_table_length * XORMAC.MACBYTES];
+        for (int i = 0; i < chi; i++) {
+            byte[][] macs_temp = new byte[cuckoo_table_length][XORMAC.MACBYTES];
+            for (int z = 0; z < cuckoo_table_length; z++) {
+                Bits data = new Bits(fingerprints_length);
+                for (int j = 0; j < ciphers.length; j++) {
+                    data.xor(ciphers[j].get(z * fingerprints_length, (z + 1) * fingerprints_length));
+                }
+                macs_temp[z] = mac_generate[i].create_without_iv(data);
+            }
+            Mac_data[i] = Utils.flatten2DArray(macs_temp);
+            Mac_data[i] = ByteUtils.xor(Mac_data[i], all_doc_rnds[i]);
+        }
+    }
+
     public static void SearchTest_DMPF(String[] search_word, XorBinaryFuse8[] Xor_filter, boolean isMac) {
-        int fingerprints_bit_len = Xor_filter[0].get_fingerprints_bit_len();
-        int num_bits_per_row = (int) Xor_filter[0].getBitCount();
-        int num_per_row = num_bits_per_row / fingerprints_bit_len;
+        int num_bits_per_row = fingerprints_length*cuckoo_table_length;
         int right_index = 0;
         int cost_all = 0;
 
         if(isMac) {
-            System.out.println("store_cost_recording:" + 3*(Tool.bit_calculate_size(ciphers)+Tool.byte_calculate_size(Mac_data)));
+            System.out.println("store_cost_recording:" + (Tool.bit_calculate_size(ciphers)+Tool.byte_calculate_size(Mac_data)));
         }else {
-            System.out.println("store_cost_recording:" + (3*Tool.bit_calculate_size(ciphers)));
+            System.out.println("store_cost_recording:" + Tool.bit_calculate_size(ciphers));
         }
 
         Bits[] all_dec_keys = Utils.read_all_keys(key_path, num_bits_per_row, store_size);
@@ -138,6 +229,9 @@ public class Less {
 
         ArrayList<Integer> order = new ArrayList<>();
         ArrayList<Integer> position = new ArrayList<>();
+
+        // Generate DMPF key...
+        start=System.nanoTime();
         for (int i = 0; i < Xor_filter.length; i++) {
             if (Xor_filter[i].getSeed() == 0) {
                 right_index = i;
@@ -153,22 +247,74 @@ public class Less {
             }
         }
 
-        int position_size = position.size();
-        long[] position_array = new long[position.size()];
-        for (int i = 0; i < position_array.length; i++)
-            position_array[i] = position.get(i);
+        double eta=1.5;
+        int M= (int) (eta*BFF_length);
+        int B=(int)Math.ceil(3.0*BFF_length/M);
+        int len = Utils.len_long(3L *BFF_length);
+        int[] Loc_1_record=new int[M],k_record=new int[M],Loc_2_record=new int[M];
+        int[] dec_position_record=new int[BFF_length];
 
-        DMPF dmpf = new DMPF(128, num_per_row, lambda);
+        for (int i=0;i<M;i++){
+            k_record[i]=0;
+            Loc_1_record[i]=-1;
+            Loc_2_record[i]=-1;
+        }
 
-        Bits[] queries = dmpf.Gen(position_array);
+        for (Integer value : position) {
+            boolean collision;
+            int times = 0;
+            int inserted_position = value;
+            do {
+                collision = false;
+                int k = Utils.getRandomNumber(1, 4);
+                int Loc_1 = (int) Cuckoo.hash(inserted_position, len, k, BFF_length, B, cuckoo_key, 3L * BFF_length);
 
+                if (Loc_1_record[Loc_1] == -1) {
+                    Loc_1_record[Loc_1] = inserted_position;
+                    dec_position_record[inserted_position] = Loc_1 * B;
+                    k_record[Loc_1] = k;
+                } else {
+                    collision = true;
+                    int temp = Loc_1_record[Loc_1];
+                    Loc_1_record[Loc_1] = inserted_position;
+                    dec_position_record[inserted_position] = Loc_1 * B;
+                    k_record[Loc_1] = k;
+                    inserted_position = temp;
+                    times++;
+                }
+            } while (collision && times < 10 * M);
+
+            if (times == 10 * cuckoo_table_length) {
+                System.out.println("Error: Fail to generate dmpf key!");
+                System.exit(-1);
+            }
+        }
+
+        Bits[][] queries = new Bits[M][];
+        int num = Utils.len_long(B); //
+        DPF dpf = new DPF(128,num);
+
+        for (int i=0;i<M;i++){
+            Bits a;
+            if(Loc_1_record[i]==-1){
+                a=Utils.long_to_bits(B,num);
+            }else {
+                int index= (int) Cuckoo.index(Loc_1_record[i],len, k_record[i], BFF_length,B,cuckoo_key, 3L * BFF_length);
+                dec_position_record[Loc_1_record[i]]=dec_position_record[Loc_1_record[i]]+index;
+                a=Utils.long_to_bits(index,num);
+            }
+            queries[i] = dpf.Gen(a);
+        }
+        end=System.nanoTime();
+        // Generate dmpf key end
+        System.out.println("Client - search query generation time:" + (end - start) / 1000000 + "ms");
         System.out.println("Queries cost:" + Tool.bit_calculate_size(queries) + " byte");
-        cost_all = cost_all + (int) Tool.bit_calculate_size(queries);
+
         double start, end;
         CountDownLatch countDownLatch = new CountDownLatch(2);
 
-        Bits[] get_data_0 = new Bits[fingerprints_bit_len];
-        Bits[] get_data_1 = new Bits[fingerprints_bit_len];
+        Bits[] get_data_0 = new Bits[fingerprints_length];
+        Bits[] get_data_1 = new Bits[fingerprints_length];
         byte[][] get_mac_0=new byte[chi][XORMAC.MACBYTES];
         byte[][] get_mac_1=new byte[chi][XORMAC.MACBYTES];
 
@@ -177,18 +323,22 @@ public class Less {
         for (int i = 0; i < get_data_1.length; i++)
             get_data_1[i] = new Bits(store_size);
 
+        //Search start ...
         start = System.nanoTime();
         Thread worker_0 = new Thread(() -> {
             try {
-                for (int i = 0; i < num_per_row; i++) {
-                    boolean res_0 = dmpf.Eval(false, queries[0], i, position_size);
-                    if (res_0) {
-                        for (int j = 0; j < get_data_0.length; j++) {
-                            get_data_0[j].xor(cipher_transposition[i * fingerprints_bit_len + j]);
-                        }
-                        if(isMac){
-                            for (int j=0;j<chi;j++){
-                                get_mac_0[j]=ByteUtils.xor(get_mac_0[j],Tool.copy_byte_array(Mac_data[j],i*XORMAC.MACBYTES,(i+1)*XORMAC.MACBYTES));
+                for (int i=0;i<M;i++){
+                    for (int j=0;j<B;j++) {
+                        Bits bit_ind = Utils.long_to_bits(j,num);
+                        boolean res_0 = dpf.Eval(false, queries[i][0],bit_ind );
+                        if(res_0){
+                            for (int n=0;n<get_data_0.length;n++){
+                                get_data_0[n].xor(cipher_transposition[(i*B+j)*fingerprints_length+n]);
+                            }
+                            if(isMac){
+                                for (int n=0;n<chi;n++){
+                                    get_mac_0[n]= ByteUtils.xor(get_mac_0[n],Tool.copy_byte_array(Mac_data[n],(i*B+j)*XORMAC.MACBYTES,(i*B+j+1)*XORMAC.MACBYTES));
+                                }
                             }
                         }
                     }
@@ -201,15 +351,18 @@ public class Less {
 
         Thread worker_1 = new Thread(() -> {
             try {
-                for (int i = 0; i < num_per_row; i++) {
-                    boolean res_1 = dmpf.Eval(true, queries[1], i, position_size);
-                    if (res_1) {
-                        for (int j = 0; j < get_data_1.length; j++) {
-                            get_data_1[j].xor(cipher_transposition[i * fingerprints_bit_len + j]);
-                        }
-                        if(isMac){
-                            for (int j=0;j<chi;j++){
-                                get_mac_1[j]=ByteUtils.xor(get_mac_1[j],Tool.copy_byte_array(Mac_data[j],i*XORMAC.MACBYTES,(i+1)*XORMAC.MACBYTES));
+                for (int i=0;i<M;i++){
+                    for (int j=0;j<B;j++) {
+                        Bits bit_ind = Utils.long_to_bits(j,num);
+                        boolean res_1 = dpf.Eval(true, queries[i][1],bit_ind );
+                        if(res_1){
+                            for (int n=0;n<get_data_1.length;n++){
+                                get_data_1[n].xor(cipher_transposition[(i*B+j)*fingerprints_length+n]);
+                            }
+                            if(isMac){
+                                for (int n=0;n<chi;n++){
+                                    get_mac_1[n]= ByteUtils.xor(get_mac_1[n],Tool.copy_byte_array(Mac_data[n],(i*B+j)*XORMAC.MACBYTES,(i*B+j+1)*XORMAC.MACBYTES));
+                                }
                             }
                         }
                     }
@@ -230,15 +383,17 @@ public class Less {
         }
         end = System.nanoTime();
         System.out.println("Server search time:" + (end - start) / 1000000 + "ms");
-
         assert all_dec_keys != null;
         Bits[] all_dec_keys_transposition = Tool.transpose(all_dec_keys);
-        System.out.println("Server_0 returns cost:" + (Tool.bit_calculate_size(get_data_0)) + " byte");
-        System.out.println("Server_1 returns cost:" + (Tool.bit_calculate_size(get_data_1)) + " byte");
+        if (isMac){
+            System.out.println("Server returns cost:" + (Tool.bit_calculate_size(get_data_0)+Tool.bit_calculate_size(queries)+Tool.byte_calculate_size(get_mac_0)) + " byte");
+        }
+        else{
+            System.out.println("Server returns cost:" + (Tool.bit_calculate_size(get_data_0)+Tool.bit_calculate_size(queries)) + " byte");
+        }
+        //Search end ...
 
-        start = System.nanoTime();
-
-        Bits[] get_data = new Bits[fingerprints_bit_len];
+        Bits[] get_data = new Bits[fingerprints_length];
         boolean Mac_valid = true;
 
         for (int i = 0; i < get_data.length; i++) {
@@ -248,12 +403,14 @@ public class Less {
         }
 
         Bits[] get_data_transposition = Tool.transpose(get_data);
+
+        start = System.nanoTime();
         if(isMac){
             byte[][] temp_nonce = new byte[chi][XORMAC.MACBYTES];
             for (int i = 0; i < chi; i++) {
                 for (int j = 0; j < ciphers.length; j++) {
                     for(int n=0;n<position.size();n++){
-                        byte[] Gamma=Tool.nonce_generate(j,lambda,position.get(n),num_per_row);
+                        byte[] Gamma=Tool.nonce_generate(j,lambda,dec_position_record[position.get(n)],cuckoo_table_length);
                         temp_nonce[i] = ByteUtils.xor(temp_nonce[i], Gamma);
                     }
                 }
@@ -279,88 +436,36 @@ public class Less {
         }
 
         if (Mac_valid) {
+            if(isMac)
+                System.out.println("Mac verification succeeded!");
             for (Integer integer : position) {
-                for (int j = 0; j < fingerprints_bit_len; j++) {
-                    get_data[j].xor(all_dec_keys_transposition[fingerprints_bit_len * integer + j]);
+                for (int j = 0; j < fingerprints_length; j++) {
+                    get_data[j].xor(all_dec_keys_transposition[fingerprints_length * dec_position_record[integer] + j]);
                 }
             }
+
             get_data = Tool.transpose(get_data);
 
             long[] temp = new long[get_data.length];
             for (int i = 0; i < temp.length; i++)
-                temp[i] = Tool.Bits_to_long(get_data[i], fingerprints_bit_len)[0];
+                temp[i] = Tool.Bits_to_long(get_data[i], fingerprints_length)[0];
             long verify = Xor_filter[right_index].verify_DMPF(search_word);
 
             for (int i = 0; i < datasize; i++) {
-                List<Integer> temp_list = map_table.get(i);
-                if (temp_list.size() == 1) {
-                    if (temp[temp_list.get(0)] == verify)
-                        System.out.print("No." + (i) + " ");
-                } else {
-                    for (Integer integer : temp_list) {
-                        if (temp[integer] == verify) {
-                            System.out.print("No." + (i) + " ");
-                            break;
-                        }
-                    }
-                }
+                if (temp[i] == verify)
+                    System.out.print("No." + (i) + " ");
             }
             end = System.nanoTime();
             System.out.println();
             System.out.println("Client query time:" + (end - start) / 1000000 + "ms");
         } else {
             end = System.nanoTime();
-            System.out.println("Mac verification failed,Client query time:" + (end - start) / 1000000 + "ms");
-        }
-    }
-
-    public static void CreateMac(int num_bits_per_row) {
-        int fingerprints_bit_len = (int) (-Math.log(fpp) / Math.log(2.0));
-        int fingerprints_num = num_bits_per_row / fingerprints_bit_len;
-        Bits source_key = Utils.base64ToBits(properties.read("MACKey_1"), lambda);
-        cff = new CoverFamily(1, 1);
-        chi = cff.getLines();
-        iv_keys = new Bits[chi];
-        mackeys = new byte[chi][];
-        mkey =Utils.base64ToBits(properties.read("Key1"), lambda);
-        mac_generate = new XORMAC[chi];
-        xor_hom.initial();
-        for (int i = 0; i < chi; i++) {
-            mackeys[i] = Utils.prf_to_len(source_key, Utils.stringToBits("MAC" + i, lambda), lambda).toByteArray();
-            iv_keys[i] = Utils.prf_to_len(mkey, Utils.byteArrayToBits(mackeys[i], lambda), lambda);
-            mac_generate[i] = new XORMAC(mackeys[i]);
-        }
-        all_doc_rnds = new byte[chi][fingerprints_num * XORMAC.MACBYTES];
-        for (int i = 0; i < chi; i++) {
-            for (int j = 0; j < ciphers.length; j++) {
-                byte[] Gamma=new byte[fingerprints_num * XORMAC.MACBYTES];
-                for(int n=0;n<fingerprints_num;n++){
-                    byte[] temp_Gamma=xor_hom.my_Gen_Proof(Tool.nonce_generate(j,lambda,n,fingerprints_num),Tool.bits_to_int(iv_keys[i]));
-                    for(int m=0;m<XORMAC.MACBYTES;m++)
-                        Gamma[n*XORMAC.MACBYTES+m]=temp_Gamma[m];
-                }
-                all_doc_rnds[i] = ByteUtils.xor(all_doc_rnds[i], Gamma);
-            }
-        }
-
-        Mac_data = new byte[chi][fingerprints_num * XORMAC.MACBYTES];
-        for (int i = 0; i < chi; i++) {
-            byte[][] macs_temp = new byte[fingerprints_num][XORMAC.MACBYTES];
-            for (int z = 0; z < fingerprints_num; z++) {
-                Bits data = new Bits(fingerprints_bit_len);
-                for (int j = 0; j < ciphers.length; j++) {
-                    data.xor(ciphers[j].get(z * fingerprints_bit_len, (z + 1) * fingerprints_bit_len));
-                }
-                macs_temp[z] = mac_generate[i].create_without_iv(data);
-            }
-            Mac_data[i] = Utils.flatten2DArray(macs_temp);
-            Mac_data[i] = ByteUtils.xor(Mac_data[i], all_doc_rnds[i]);
+            System.out.println("Mac verification failed, Client query time:" + (end - start) / 1000000 + "ms");
         }
     }
 
     public static void Update(boolean isMac, long[] update_data) {
-        double start,end,test_start,test_end;
-        int fingerprints_bit_len = (int) (-Math.log(fpp) / Math.log(2.0));
+        double start,end;
         List<XorBinaryFuse8> filter_list = new ArrayList<XorBinaryFuse8>();
         PropertiesCache properties =new PropertiesCache();
         Bits mkey = Utils.base64ToBits(properties.read("Key1"), lambda);
@@ -368,7 +473,6 @@ public class Less {
 
         start= System.nanoTime();
 
-        test_start=System.nanoTime();
         XorBinaryFuse8 xorBinaryFuse8=XorBinaryFuse8.construct(keyword_size,update_data,fpp);
 
         if(xorBinaryFuse8.getSeed()!=0){
@@ -381,48 +485,51 @@ public class Less {
             filter_list.add(xorBinaryFuse8);
         }
 
-        Bits[] cipher=new Bits[filter_list.size()];
+        long[][] update_cuckoo_table=new long[filter_list.size()][cuckoo_table_length];
+        for (int i=0;i<filter_list.size();i++){
+            for (int j=0;j<BFF_length;j++){
+                for (int k=1;k<=3;k++){
+                    update_cuckoo_table[i][(int) position_record[j][k-1]]=filter_list.get(i).fingerprints[j];
+                }
+            }
+        }
+
+        Bits[] update_cipher=new Bits[filter_list.size()];
 
         for (int i=0;i<filter_list.size();i++){
             if(i!=0)
                 enc_key= PRFCipher.generateKey(mkey,lambda,i,0);
-            cipher[i]=new Bits((int) filter_list.get(i).getBitCount());
-            cipher[i].xor(Tool.long_to_Bits(filter_list.get(i).fingerprints,fingerprints_bit_len));
-            cipher[i].xor(enc_key);
+            update_cipher[i]=new Bits(cuckoo_table_length*fingerprints_length);
+            update_cipher[i].xor(Tool.long_to_Bits(update_cuckoo_table[i],fingerprints_length));
+            Bits ext_key = PRFCipher.extend_key(enc_key, lambda, cuckoo_table_length*fingerprints_length);
+            update_cipher[i].xor(ext_key);
         }
-        test_end=System.nanoTime();
-        System.out.println("construct time: "+(test_end-test_start)/1000000);
 
         if(isMac){
-            int fingerprints_num = cipher[0].length() / fingerprints_bit_len;
-
-            all_doc_rnds = new byte[chi][fingerprints_num * XORMAC.MACBYTES];
-            Mac_data = new byte[chi][fingerprints_num * XORMAC.MACBYTES];
-
+            all_doc_rnds = new byte[chi][cuckoo_table_length * XORMAC.MACBYTES];
+            Mac_data = new byte[chi][cuckoo_table_length * XORMAC.MACBYTES];
             for (int i = 0; i < chi; i++) {
                 Mac_data[i] = ByteUtils.xor(Mac_data[i], all_doc_rnds[i]);
-                for (int j = 0; j < cipher.length; j++) {
-                    byte[] Gamma = Utils.prf_iv_doc(iv_keys[i], "random" + (j+datasize) + 0 + "iv", lambda, fingerprints_num);
+                for (int j = 0; j < update_cipher.length; j++) {
+                    byte[] Gamma = Utils.prf_iv_doc(iv_keys[i], "random" + (j+store_size) + 0 + "iv", lambda, cuckoo_table_length);
                     all_doc_rnds[i] = ByteUtils.xor(all_doc_rnds[i], Gamma);
                 }
-                byte[][] macs_temp = new byte[fingerprints_num][XORMAC.MACBYTES];
-                for (int z = 0; z < fingerprints_num; z++) {
-                    Bits data = new Bits(fingerprints_bit_len);
-                    for (int j = 0; j < cipher.length; j++) {
-                        data.xor(cipher[j].get(z * fingerprints_bit_len, (z + 1) * fingerprints_bit_len));
+                byte[][] macs_temp = new byte[cuckoo_table_length][XORMAC.MACBYTES];
+                for (int z = 0; z < cuckoo_table_length; z++) {
+                    Bits data = new Bits(fingerprints_length);
+                    for (int j = 0; j < update_cipher.length; j++) {
+                        data.xor(update_cipher[j].get(z * fingerprints_length, (z + 1) * fingerprints_length));
                     }
                     macs_temp[z] = mac_generate[i].create_without_iv(data);
                 }
                 Mac_data[i] = ByteUtils.xor(Mac_data[i],Utils.flatten2DArray(macs_temp));
                 Mac_data[i] = ByteUtils.xor(Mac_data[i], all_doc_rnds[i]);
             }
-
-            System.out.println("update cost:"+(3*(cipher.length*cipher[0].length()/8+fingerprints_num * XORMAC.MACBYTES*chi)));
+            System.out.println("update cost:"+(update_cipher.length*update_cipher[0].length()/8+BFF_length * XORMAC.MACBYTES*chi)+"byte");
         }
-
         end= System.nanoTime();
         if(!isMac)
-            System.out.println("update cost:"+(3*cipher.length*cipher[0].length()/8));
+            System.out.println("update cost:"+(update_cipher.length*update_cipher[0].length()/8)+"byte");
         System.out.println("client Update time:"+(end-start)/1000000+"ms");
 
     }
@@ -432,7 +539,7 @@ public class Less {
         keyword_size = 128;
         data_path = "D:\\study\\paper\\paper_code\\Less_project\\src\\main\\java\\org\\example\\dataset\\synthetic_128_100.csv";
         isMac = true;
-        fpp = Math.pow(2, -24);
+        fpp = Math.pow(2, -32);
     }
 
     public static void main(String[] args) throws NoSuchAlgorithmException {
@@ -446,15 +553,12 @@ public class Less {
 
         initial();
         XorBinaryFuse8[] Xor_filter = read_data(data_path, datasize, fpp);
-        if (Xor_filter != null) {
-            store_size = Xor_filter.length;
-            Bits[] plaintext = extract_fingerprints(Xor_filter);
-            Enc(plaintext);
-            if(isMac)
-                CreateMac((int) Xor_filter[0].getBitCount());
-            SearchTest_DMPF(search_word, Xor_filter, isMac);
-            //Update(isMac, update_data);
-        }
+        Bits[] plaintext = generate_cuckoo_table(Xor_filter);
+        store_size = Xor_filter.length;
+        Enc(plaintext);
+        if(isMac)
+            CreateMac();
+        SearchTest_DMPF(search_word, Xor_filter, isMac);
+        Update(isMac, update_data);
     }
-
 }
