@@ -10,13 +10,13 @@ World Language: https://www.statmt.org/lm-benchmark/
 
    ​	datasize：the number of file
 
-   ​	keyword_size is the number of keywords contained in each file. By default, the number of keywords in each file is the same
+   ​	keyword_size is the number of keywords contained in each file. By default, the number of keywords in each file is the same.
 
-2. Change file path cipher_path,key_path,key_original_path and data_path
+2. Change file path cipher_path,key_path,key_original_path and data_path.
 
-   ​	The file represented by cipher_path,key_path,key_original_path is generated in code
+   ​	The file represented by cipher_path,key_path,key_original_path is generated in code.
 
-   ​	The file represented by data_path is experimental data, which must exist before code generation
+   ​	The file represented by data_path is experimental data, which must exist before code generation.
    
 4. We also present a scheme 'Less_2.java' with less storage overhead. Although its query speed is slightly reduced, it is still much faster than Dory.
 
