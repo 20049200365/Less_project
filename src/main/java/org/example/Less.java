@@ -3,7 +3,6 @@ package org.example;
 import modules.modules.*;
 import org.bouncycastle.pqc.math.linearalgebra.ByteUtils;
 import org.fastfilter.xor.XorBinaryFuse8;
-
 import java.io.*;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
