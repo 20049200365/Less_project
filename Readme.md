@@ -18,7 +18,7 @@ World Language: https://www.statmt.org/lm-benchmark/
 
    ​	The file represented by data_path is experimental data, which must exist before code generation.
    
-4. We also present a scheme 'Less_2.java' with less storage overhead. Although its query speed is slightly reduced, it is still much faster than Dory.
+4. We also present a scheme 'Less_free.java' with less storage overhead. Although its query speed is slightly reduced, it is still much faster than Dory.
 
 # Result
 
