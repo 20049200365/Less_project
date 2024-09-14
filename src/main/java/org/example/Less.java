@@ -28,7 +28,7 @@ public class Less {
 
     static public byte[][] Mac_data;
 
-    static public MAC nounce_prf;
+    static public Nonce_PRF nounce_prf;
     static public byte[] nonce_key;
     static public double fpp = Math.pow(2, -8);
 
@@ -178,7 +178,7 @@ public class Less {
         mackeys = new byte[chi][];
         mkey =Utils.base64ToBits(properties.read("Key1"), lambda);
         nonce_key = PRFCipher.extend_key(Utils.base64ToBits(properties.read("MACKey_1"), lambda), lambda, lambda * 2).toByteArray();
-        nounce_prf = new MAC(nonce_key);
+        nounce_prf = new Nonce_PRF(nonce_key);
         mac_generate = new XORMAC[chi];
         xor_hom.initial();
 
@@ -558,7 +558,6 @@ public class Less {
 
     public static void main(String[] args) throws NoSuchAlgorithmException {
         //Create search_word
-        //String[] search_word_all = new String[]{"trip","desir","necessari","busi","meet","product","tri","stimul","speak","quiet","wait","meet","held","round","tabl","format","austin","play","golf","rent","ski","boat","jet","ski","fli","somewher","time"};
         String[] search_word_all = new String[]{"0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11"};
         String[] search_word = new String[12];
         long[] update_data = new long[]{1L, 2L, 3L};
