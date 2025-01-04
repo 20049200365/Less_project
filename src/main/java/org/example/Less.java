@@ -3,8 +3,6 @@ package org.example;
 import modules.modules.Bits;
 import modules.modules.*;
 import org.bouncycastle.pqc.math.linearalgebra.ByteUtils;
-import org.example.Tool;
-import org.example.xor_hom;
 import org.fastfilter.xor.XorBinaryFuse8;
 
 import java.io.*;
@@ -26,7 +24,7 @@ public class Less {
     static public Bits[] ciphers;
     static public byte[] Mac_data;
 
-    static public MAC nonce_prf,mackey_prf;
+    static public Nonce_prf nonce_prf,mackey_prf;
     static public byte[] nonce_key,source_key;
     static public double fpp = Math.pow(2, -8);
 
@@ -169,7 +167,7 @@ public class Less {
     }
 
     public static void CreateMac() {
-        source_key=new byte[MAC.KEYBYTES];
+        source_key=new byte[Nonce_prf.KEYBYTES];
 
         record_1=new byte[ciphers.length][];
         record_2=new byte[ciphers.length][];
@@ -179,9 +177,9 @@ public class Less {
             source_key[i]=(byte) (random.nextInt(256)-128);
         }
 
-        mackey_prf=new MAC(source_key);
+        mackey_prf=new Nonce_prf(source_key);
         nonce_key = PRFCipher.extend_key(Utils.base64ToBits(properties.read("MACKey_1"), lambda), lambda, lambda * 2).toByteArray();
-        nonce_prf = new MAC(nonce_key);
+        nonce_prf = new Nonce_prf(nonce_key);
 
         XORMAC mac_generate;
         byte[] mackeys;
