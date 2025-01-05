@@ -19,8 +19,6 @@ DBLP: https://dblp.uni-trier.de/
 
    ​	The file represented by data_path is experimental data, which must exist before code generation.
    
-4. We also present a scheme 'Less_free.java' with less storage overhead. Although its query speed is slightly reduced, it is still much faster than Dory.
-
 # Result
 
 Take the query {"travel", "busi", "meet", "fun", "trip", "especi"} in Enron dataset as an example
